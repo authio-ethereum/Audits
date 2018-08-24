@@ -18,7 +18,7 @@ library SafeMathLib{
     assert(b <= a);
     return a - b;
   }
-  
+
   function add(uint256 a, uint256 b) internal pure returns (uint256) {
     uint256 c = a + b;
     assert(c >= a);
@@ -54,13 +54,13 @@ contract ApproveAndCallFallBack {
 
 contract CoinvestToken is Ownable {
     using SafeMathLib for uint256;
-    
+
     string public constant symbol = "COIN";
     string public constant name = "Coinvest COIN V2 Token";
-    
+
     uint8 public constant decimals = 18;
     uint256 private _totalSupply = 107142857 * (10 ** 18);
-    
+
     bytes4 internal constant transferSig = 0xa9059cbb;
     bytes4 internal constant approveSig = 0x095ea7b3;
     bytes4 internal constant increaseApprovalSig = 0xd73dd623;
@@ -71,9 +71,9 @@ contract CoinvestToken is Ownable {
     mapping(address => uint256) balances;
 
     mapping(address => mapping (address => uint256)) allowed;
-    
+
     mapping (address => uint256) nonces;
-    
+
     mapping (address => mapping (bytes => bool)) invalidSignatures;
 
     mapping (bytes4 => bytes4) public standardSigs;
@@ -81,26 +81,26 @@ contract CoinvestToken is Ownable {
     event Transfer(address indexed from, address indexed to, uint tokens);
     event Approval(address indexed from, address indexed spender, uint tokens);
     event SignatureRedeemed(bytes _sig, address indexed from);
-    
+
     constructor()
       public
     {
         balances[msg.sender] = _totalSupply;
     }
-    
-    function () 
+
+    function ()
       public
     {
         bytes memory calldata = msg.data;
         bytes4 new_selector = standardSigs[msg.sig];
         require(new_selector != 0);
-        
+
         assembly {
            mstore(add(0x20, calldata), new_selector)
         }
-        
+
         require(address(this).delegatecall(calldata));
-        
+
         assembly {
             if iszero(eq(returndatasize, 0x20)) { revert(0, 0) }
             returndatacopy(0, 0, returndatasize)
@@ -110,14 +110,14 @@ contract CoinvestToken is Ownable {
 
 /** ******************************** ERC20 ********************************* **/
 
-    function transfer(address _to, uint256 _amount) 
+    function transfer(address _to, uint256 _amount)
       public
     returns (bool success)
     {
         require(_transfer(msg.sender, _to, _amount));
         return true;
     }
-    
+
     function transferFrom(address _from, address _to, uint _amount)
       public
     returns (bool success)
@@ -128,34 +128,34 @@ contract CoinvestToken is Ownable {
         require(_transfer(_from, _to, _amount));
         return true;
     }
-    
-    function approve(address _spender, uint256 _amount) 
+
+    function approve(address _spender, uint256 _amount)
       public
     returns (bool success)
     {
         require(_approve(msg.sender, _spender, _amount));
         return true;
     }
-    
-    function increaseApproval(address _spender, uint256 _amount) 
+
+    function increaseApproval(address _spender, uint256 _amount)
       public
     returns (bool success)
     {
         require(_increaseApproval(msg.sender, _spender, _amount));
         return true;
     }
-    
-    function decreaseApproval(address _spender, uint256 _amount) 
+
+    function decreaseApproval(address _spender, uint256 _amount)
       public
     returns (bool success)
     {
         require(_decreaseApproval(msg.sender, _spender, _amount));
         return true;
     }
-    
-    function approveAndCall(address _spender, uint256 _amount, bytes _data) 
+
+    function approveAndCall(address _spender, uint256 _amount, bytes _data)
       public
-    returns (bool success) 
+    returns (bool success)
     {
         require(_approve(msg.sender, _spender, _amount));
         ApproveAndCallFallBack(_spender).receiveApproval(msg.sender, _amount, address(this), _data);
@@ -163,22 +163,22 @@ contract CoinvestToken is Ownable {
     }
 
 /** ****************************** Internal ******************************** **/
-    
+
     function _transfer(address _from, address _to, uint256 _amount)
       internal
     returns (bool success)
     {
         require (_to != address(0));
         require(balances[_from] >= _amount);
-        
+
         balances[_from] = balances[_from].sub(_amount);
         balances[_to] = balances[_to].add(_amount);
-        
+
         emit Transfer(_from, _to, _amount);
         return true;
     }
-    
-    function _approve(address _owner, address _spender, uint256 _amount) 
+
+    function _approve(address _owner, address _spender, uint256 _amount)
       internal
     returns (bool success)
     {
@@ -186,7 +186,7 @@ contract CoinvestToken is Ownable {
         emit Approval(_owner, _spender, _amount);
         return true;
     }
-    
+
     function _increaseApproval(address _owner, address _spender, uint256 _amount)
       internal
     returns (bool success)
@@ -195,157 +195,157 @@ contract CoinvestToken is Ownable {
         emit Approval(_owner, _spender, allowed[_owner][_spender]);
         return true;
     }
-    
+
     function _decreaseApproval(address _owner, address _spender, uint256 _amount)
       internal
     returns (bool success)
     {
         if (allowed[_owner][_spender] <= _amount) allowed[_owner][_spender] = 0;
         else allowed[_owner][_spender] = allowed[_owner][_spender].sub(_amount);
-        
+
         emit Approval(_owner, _spender, allowed[_owner][_spender]);
         return true;
     }
-    
+
 /** ************************ Delegated Functions *************************** **/
 
     function transferPreSigned(
         bytes _signature,
-        address _to, 
-        uint256 _value, 
-        uint256 _gasPrice, 
-        uint256 _nonce) 
+        address _to,
+        uint256 _value,
+        uint256 _gasPrice,
+        uint256 _nonce)
       public
       validPayload(292)
-    returns (bool) 
+    returns (bool)
     {
         uint256 gas = gasleft();
-        
+
         address from = recoverPreSigned(_signature, transferSig, _to, _value, "", _gasPrice, _nonce);
         require(from != address(0));
-        
+
         require(!invalidSignatures[from][_signature]);
         invalidSignatures[from][_signature] = true;
         nonces[from]++;
-        
+
         require(_transfer(from, _to, _value));
 
         if (_gasPrice > 0) {
-            
+
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
-    
+
     function approvePreSigned(
         bytes _signature,
-        address _to, 
-        uint256 _value, 
-        uint256 _gasPrice, 
-        uint256 _nonce) 
+        address _to,
+        uint256 _value,
+        uint256 _gasPrice,
+        uint256 _nonce)
       public
       validPayload(292)
-    returns (bool) 
+    returns (bool)
     {
         uint256 gas = gasleft();
         address from = recoverPreSigned(_signature, approveSig, _to, _value, "", _gasPrice, _nonce);
         require(from != address(0));
         require(!invalidSignatures[from][_signature]);
-        
+
         invalidSignatures[from][_signature] = true;
         nonces[from]++;
-        
+
         require(_approve(from, _to, _value));
 
         if (_gasPrice > 0) {
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
-    
+
     function increaseApprovalPreSigned(
         bytes _signature,
-        address _to, 
-        uint256 _value, 
-        uint256 _gasPrice, 
+        address _to,
+        uint256 _value,
+        uint256 _gasPrice,
         uint256 _nonce)
       public
       validPayload(292)
-    returns (bool) 
+    returns (bool)
     {
         uint256 gas = gasleft();
         address from = recoverPreSigned(_signature, increaseApprovalSig, _to, _value, "", _gasPrice, _nonce);
         require(from != address(0));
         require(!invalidSignatures[from][_signature]);
-        
+
         invalidSignatures[from][_signature] = true;
         nonces[from]++;
-        
+
         require(_increaseApproval(from, _to, _value));
 
         if (_gasPrice > 0) {
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
-    
+
     function decreaseApprovalPreSigned(
         bytes _signature,
-        address _to, 
-        uint256 _value, 
-        uint256 _gasPrice, 
-        uint256 _nonce) 
+        address _to,
+        uint256 _value,
+        uint256 _gasPrice,
+        uint256 _nonce)
       public
       validPayload(292)
-    returns (bool) 
+    returns (bool)
     {
         uint256 gas = gasleft();
         address from = recoverPreSigned(_signature, decreaseApprovalSig, _to, _value, "", _gasPrice, _nonce);
         require(from != address(0));
         require(!invalidSignatures[from][_signature]);
-        
+
         invalidSignatures[from][_signature] = true;
         nonces[from]++;
-        
+
         require(_decreaseApproval(from, _to, _value));
 
         if (_gasPrice > 0) {
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
-    
+
     function approveAndCallPreSigned(
         bytes _signature,
-        address _to, 
+        address _to,
         uint256 _value,
         bytes _extraData,
-        uint256 _gasPrice, 
-        uint256 _nonce) 
+        uint256 _gasPrice,
+        uint256 _nonce)
       public
       validPayload(356)
-    returns (bool) 
+    returns (bool)
     {
         uint256 gas = gasleft();
         address from = recoverPreSigned(_signature, approveAndCallSig, _to, _value, _extraData, _gasPrice, _nonce);
         require(from != address(0));
         require(!invalidSignatures[from][_signature]);
-        
+
         invalidSignatures[from][_signature] = true;
         nonces[from]++;
-        
+
         require(_approve(from, _to, _value));
         ApproveAndCallFallBack(_to).receiveApproval(from, _value, address(this), _extraData);
 
@@ -353,23 +353,23 @@ contract CoinvestToken is Ownable {
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
 
 /** *************************** Revoke PreSigned ************************** **/
-    
+
     function revokeSignature(bytes _sigToRevoke)
       public
     returns (bool)
     {
         invalidSignatures[msg.sender][_sigToRevoke] = true;
-        
+
         emit SignatureRedeemed(_sigToRevoke, msg.sender);
         return true;
     }
-    
+
     function revokeSignaturePreSigned(
         bytes _signature,
         bytes _sigToRevoke,
@@ -382,18 +382,18 @@ contract CoinvestToken is Ownable {
         address from = recoverRevokeHash(_signature, _sigToRevoke, _gasPrice);
         require(!invalidSignatures[from][_signature]);
         invalidSignatures[from][_signature] = true;
-        
+
         invalidSignatures[from][_sigToRevoke] = true;
-        
+
         if (_gasPrice > 0) {
             gas = 35000 + gas.sub(gasleft());
             require(_transfer(from, msg.sender, _gasPrice.mul(gas)));
         }
-        
+
         emit SignatureRedeemed(_signature, from);
         return true;
     }
-    
+
     function getRevokeHash(bytes _sigToRevoke, uint256 _gasPrice)
       public
       pure
@@ -409,23 +409,23 @@ contract CoinvestToken is Ownable {
     {
         return ecrecoverFromSig(getSignHash(getRevokeHash(_sigToRevoke, _gasPrice)), _signature);
     }
-    
+
 /** ************************** PreSigned Constants ************************ **/
 
     function getPreSignedHash(
         bytes4 _function,
-        address _to, 
+        address _to,
         uint256 _value,
         bytes _extraData,
         uint256 _gasPrice,
         uint256 _nonce)
       public
       view
-    returns (bytes32 txHash) 
+    returns (bytes32 txHash)
     {
         return keccak256(address(this), _function, _to, _value, _extraData, _gasPrice, _nonce);
     }
-    
+
     function recoverPreSigned(
         bytes _sig,
         bytes4 _function,
@@ -433,14 +433,14 @@ contract CoinvestToken is Ownable {
         uint256 _value,
         bytes _extraData,
         uint256 _gasPrice,
-        uint256 _nonce) 
+        uint256 _nonce)
       public
       view
     returns (address recovered)
     {
         return ecrecoverFromSig(getSignHash(getPreSignedHash(_function, _to, _value, _extraData, _gasPrice, _nonce)), _sig);
     }
-    
+
     function getSignHash(bytes32 _hash)
       public
       pure
@@ -449,10 +449,10 @@ contract CoinvestToken is Ownable {
         return keccak256("\x19Ethereum Signed Message:\n32", _hash);
     }
 
-    function ecrecoverFromSig(bytes32 hash, bytes sig) 
-      public 
-      pure 
-    returns (address recoveredAddress) 
+    function ecrecoverFromSig(bytes32 hash, bytes sig)
+      public
+      pure
+    returns (address recoveredAddress)
     {
         bytes32 r;
         bytes32 s;
@@ -477,12 +477,12 @@ contract CoinvestToken is Ownable {
     {
         return nonces[_owner];
     }
-    
+
 /** ****************************** Constants ******************************* **/
-    
-    function totalSupply() 
+
+    function totalSupply()
       external
-      view 
+      view
      returns (uint256)
     {
         return _totalSupply;
@@ -490,32 +490,32 @@ contract CoinvestToken is Ownable {
 
     function balanceOf(address _owner)
       external
-      view 
-    returns (uint256) 
+      view
+    returns (uint256)
     {
         return balances[_owner];
     }
-    
-    function allowance(address _owner, address _spender) 
+
+    function allowance(address _owner, address _spender)
       external
-      view 
-    returns (uint256) 
+      view
+    returns (uint256)
     {
         return allowed[_owner][_spender];
     }
-    
+
 /** ****************************** onlyOwner ******************************* **/
-    
+
     function token_escape(address _tokenContract)
       external
       onlyOwner
     {
         CoinvestToken lostToken = CoinvestToken(_tokenContract);
-        
+
         uint256 stuckTokens = lostToken.balanceOf(address(this));
         lostToken.transfer(owner, stuckTokens);
     }
-    
+
     function updateStandard(bytes4 _standardSig, bytes4 _ourSig)
       external
       onlyOwner
@@ -526,9 +526,9 @@ contract CoinvestToken is Ownable {
         standardSigs[_standardSig] = _ourSig;
         return true;
     }
-    
+
 /** ***************************** Modifiers ******************************** **/
-    
+
     modifier validPayload(uint _size) {
         uint payload_size;
         assembly {
@@ -537,6 +537,5 @@ contract CoinvestToken is Ownable {
         require(payload_size >= _size);
         _;
     }
-    
-}
 
+}
